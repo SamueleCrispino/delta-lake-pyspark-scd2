@@ -1,0 +1,2 @@
+contratto_cod|numero_annuncio|list_total|contracted_price|total_discount|data_attivazione|data_fine_prestazione|product_code|quantity|causale_annullamento|data_annullamento|status_item|creazione_dta
+Y06119362|10|40.53|500.00|0|||CRMCO|1|||R|1/12/2023
