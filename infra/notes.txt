@@ -111,7 +111,7 @@ pip install pandas pyarrow
 
 
 
-#######################
+#######################  CLONING SPARK REPO
 cd /data
 git clone <il_tuo_repo_git> project || true
 # o copia via scp

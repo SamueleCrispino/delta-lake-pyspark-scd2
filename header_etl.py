@@ -1,4 +1,5 @@
 import re
+import sys
 import pyspark
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import coalesce, concat, input_file_name, current_timestamp, date_format, col, to_date, trim, when, count as spark_count, collect_set, size, expr, to_timestamp, lit, lead, year, month, dayofmonth, min as spark_min
@@ -274,6 +275,13 @@ def run_job_header(spark, read_path, write_path, discarded_path):
     
 
 if __name__ == '__main__':
+
+    # Controlla se l'argomento è stato fornito
+    if len(sys.argv) > 1:
+        header_id = sys.argv[1]
+    else:
+        print("Usage: python your_script_name.py <path_to_crm_table>")
+        sys.exit(1) # Esce se l'argomento non è fornito
     
     spark = SparkSession.builder \
         .appName("TestDataContract") \
@@ -289,7 +297,7 @@ if __name__ == '__main__':
     
     crm_path= "crm_with_event_time/"
     crm_table_path = crm_path + table_name
-    crm_table_partition_path = crm_table_path + 'header_20230124.csv'
+    crm_table_partition_path = crm_table_path + header_id #'header_20230124.csv'
     
     write_path = "landing/" + table_name
     
