@@ -91,6 +91,9 @@ def run_job_items(spark, read_path, write_path):
         
         
         # Rows to INSERT new variations of existing items
+        # JOIN between EXISTING and INPUT/UPDATES
+        # join key: ["contratto_cod", "numero_annuncio"]
+        # then keeps: "OPEN RECORDS" that differs from updates
         newItemsToInsert = df_transformed \
             .alias("updates") \
             .join(delta_table.toDF().alias("existing"), ["contratto_cod", "numero_annuncio"]) \
@@ -146,9 +149,9 @@ if __name__ == '__main__':
     spark = SparkSession.builder \
         .appName("TestDataContract") \
         .config("spark.sql.legacy.timeParserPolicy", "CORRECTED") \
-        .config("spark.jars.packages", "io.delta:delta-spark_2.13:3.1.0")\
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.1.0")\
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")\
         .getOrCreate()
 
-    crm_table_path = crm_table_path + 'items_20230123.txt'
-    run_job_items(spark, crm_table_path, delta_path)
+    crm_table_partition_path = crm_table_path + 'items_20230123.txt'
+    run_job_items(spark, crm_table_partition_path, delta_path)
