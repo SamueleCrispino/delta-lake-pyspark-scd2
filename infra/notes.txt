@@ -112,7 +112,7 @@ pip install pandas pyarrow
 
 
 #######################  CLONING SPARK REPO
-cd /data
+cd /data  --> you don't have to create it, it must already exist!! "/data" != "data"
 git clone <il_tuo_repo_git> project || true
 # o copia via scp
 # assicurati che i permessi siano giusti
@@ -121,9 +121,10 @@ sudo chown -R Crispinoadmin:Crispinoadmin /data/project
 
 ##### RUNNING
 # dal manager
-source /data/project/venv/bin/activate   # opzionale, ma utile per aver python nel PATH
-export PYSPARK_PYTHON=/data/project/venv/bin/python
-export PYSPARK_DRIVER_PYTHON=/data/project/venv/bin/python
+source /data/delta-lake-pyspark-scd2/venv/bin/activate  # opzionale, ma utile per aver python nel PATH
+
+export PYSPARK_PYTHON=/data/delta-lake-pyspark-scd2/venv/bin/python
+export PYSPARK_DRIVER_PYTHON=/data/delta-lake-pyspark-scd2/venv/bin/python
 
 # spark-submit con jar delta (usiamo --packages per scaricarlo)
 $SPARK_HOME/bin/spark-submit \
@@ -132,8 +133,8 @@ $SPARK_HOME/bin/spark-submit \
   --conf "spark.sql.legacy.timeParserPolicy=CORRECTED" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
   --packages io.delta:delta-spark_2.12:3.1.0 \
-  /data/project/header_etl.py \
-  --read-path /data/project/crm_with_event_time/header/header_20230122.csv \
+  /data/delta-lake-pyspark-scd2/header_etl.py \
+  --read-path /data/delta-lake-pyspark-scd2/crm_with_event_time/header/header_20230122.csv \
   --write-path /data/delta/landing/header
 
 # NOTA: Importante: usa PYSPARK_PYTHON per far usare il python del virtualenv. --packages farà scaricare il JAR delta-spark al primo run.

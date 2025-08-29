@@ -277,10 +277,11 @@ def run_job_header(spark, read_path, write_path, discarded_path):
 if __name__ == '__main__':
 
     # Controlla se l'argomento è stato fornito
-    if len(sys.argv) > 1:
-        header_id = sys.argv[1]
+    if len(sys.argv) > 2:
+        read_path = sys.argv[1]
+        base_write_path = sys.argv[2]
     else:
-        print("Usage: python your_script_name.py <path_to_crm_table>")
+        print("Usage: python header_etl.py <read_path> <base_write_path>")
         sys.exit(1) # Esce se l'argomento non è fornito
     
     spark = SparkSession.builder \
@@ -294,13 +295,10 @@ if __name__ == '__main__':
 
     #### PATH DEFINITIONS:
     table_name = "header/"
+
     
-    crm_path= "crm_with_event_time/"
-    crm_table_path = crm_path + table_name
-    crm_table_partition_path = crm_table_path + header_id #'header_20230124.csv'
-    
-    write_path = "landing/" + table_name
-    
-    discarded_path = "discarded/" + table_name
+    ### WRITE:
+    write_path = base_write_path + "landing/" + table_name
+    discarded_path = base_write_path + "discarded/" + table_name
   
-    run_job_header(spark, crm_table_partition_path, write_path, discarded_path)
+    run_job_header(spark, read_path, write_path, discarded_path)
