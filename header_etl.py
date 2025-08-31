@@ -57,6 +57,7 @@ def run_job_header(spark, read_path, write_path, discarded_path, metrics_path):
     print("READ_PATH: ", read_path)
     print("WRITE_PATH: ", write_path)
 
+    filename = read_path.split("/")[-1]
 
     # EXTRACT
     start_ts_extract = datetime.utcnow().isoformat()
@@ -64,9 +65,9 @@ def run_job_header(spark, read_path, write_path, discarded_path, metrics_path):
                     .schema(header_schema)\
                     .csv(read_path)\
                     .withColumn("closed_by_batch", lit(None).cast(StringType()))\
-                    .withColumn("source_file", input_file_name())\
+                    .withColumn("source_file", lit(filename))\
                     .withColumn("ingest_ts", current_timestamp())\
-                    .withColumn("batch_id", concat(date_format(current_timestamp(), timestamp_format), lit("_"), input_file_name()))
+                    .withColumn("batch_id", concat(date_format(current_timestamp(), timestamp_format), lit("_"), lit(filename)))
 
     batch_id_row = df_extracted.select("batch_id").limit(1).collect()
     batch_id = batch_id_row[0]["batch_id"]
@@ -333,7 +334,7 @@ def run_job_header(spark, read_path, write_path, discarded_path, metrics_path):
 
     # WRITING METRICS
     #write_run_metrics_spark(spark, run_metrics, metrics_path)
-    metrics_path =  metrics_path.rstrip("/") + f"/run_metrics_{batch_id}"
+    metrics_path =  metrics_path + f"/{batch_id}"
     df_metrics = spark.createDataFrame([Row(**run_metrics)])
     df_metrics.write.mode("append").csv(metrics_path, header=True)
 
