@@ -4,6 +4,7 @@ import re
 import sys
 import pyspark
 from pyspark.sql import SparkSession
+from pyspark.sql import Row
 from pyspark.sql.functions import coalesce, concat, input_file_name, current_timestamp, date_format, col, to_date, trim, when, count as spark_count, collect_set, size, expr, to_timestamp, lit, lead, year, month, dayofmonth, min as spark_min
 from pyspark.sql.types import StructType, StructField, StringType, DateType, DecimalType, IntegerType, TimestampType
 from functools import reduce
@@ -332,7 +333,10 @@ def run_job_header(spark, read_path, write_path, discarded_path, metrics_path):
         run_metrics[f"dq_{k}"] = v
 
     # WRITING METRICS
-    write_run_metrics_spark(spark, run_metrics, metrics_path)
+    #write_run_metrics_spark(spark, run_metrics, metrics_path)
+    metrics_path =  metrics_path.rstrip("/") + f"/run_metrics_{batch_id}"
+    df_metrics = spark.createDataFrame([Row(**run_metrics)])
+    df_metrics.write.mode("append").csv(metrics_path, header=True)
 
 
 if __name__ == '__main__':
