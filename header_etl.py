@@ -1,3 +1,5 @@
+import os, json, traceback
+from datetime import datetime
 import re
 import sys
 import pyspark
@@ -8,8 +10,10 @@ from functools import reduce
 from operator import or_
 from delta.tables import *
 from pyspark.sql import Window
+import requests
 
 from utils.validations_utils import validation
+from utlis.write_metrics import write_run_metrics_spark
 
 # DEBUG:
 print("pyspark version: ", pyspark.__version__)
@@ -45,12 +49,16 @@ header_schema = StructType([
 ])
 
 
-def run_job_header(spark, read_path, write_path, discarded_path):
+def run_job_header(spark, read_path, write_path, discarded_path, metrics_path):
+
+    start_ts = datetime.utcnow().isoformat()
 
     print("READ_PATH: ", read_path)
     print("WRITE_PATH: ", write_path)
 
+
     # EXTRACT
+    start_ts_extract = datetime.utcnow().isoformat()
     df_extracted = spark.read.option("header", "true").option("sep", "|")\
                     .schema(header_schema)\
                     .csv(read_path)\
@@ -61,14 +69,21 @@ def run_job_header(spark, read_path, write_path, discarded_path):
 
     batch_id_row = df_extracted.select("batch_id").limit(1).collect()
     batch_id = batch_id_row[0]["batch_id"]
+
+    end_ts_extract = datetime.utcnow().isoformat()
+    duration_s_extract = (datetime.fromisoformat(end_ts_extract) - datetime.fromisoformat(start_ts_extract)).total_seconds()
     
     ### APPLYING VALIDATIONS RULES:
-    validated_df = validation(df_extracted, deduplication_keys, spark, date_regex, discarded_path, batch_id)
-
+    start_ts_validation = datetime.utcnow().isoformat()
+    validated_df, dq_metrics = validation(df_extracted, deduplication_keys, spark, date_regex, discarded_path, batch_id)
+    end_ts_validation = datetime.utcnow().isoformat()
+    duration_s_validation = (datetime.fromisoformat(end_ts_validation) - datetime.fromisoformat(start_ts_validation)).total_seconds()
+    
     
     ### TRANSFORM and APPLYING INTRA-BATCH VERSIONS
     # 1) Parse event_time in timestamp con fallback 
     # (se parsing fallisce usa mezzanotte della valid_from date)
+    start_ts_transform = datetime.utcnow().isoformat()
     df_parsed = validated_df.withColumn(
         "event_time_ts",
         coalesce(
@@ -85,6 +100,7 @@ def run_job_header(spark, read_path, write_path, discarded_path):
     )
 
     # 2) Genera version rows intra-batch con lead()
+    
     w = Window.partitionBy("contratto_cod").orderBy(col("event_time_ts").asc())
 
     df_versions = (
@@ -105,7 +121,7 @@ def run_job_header(spark, read_path, write_path, discarded_path):
                          .withColumn("valid_from_year", year("valid_from_ts")) \
                          .withColumn("valid_from_month", month("valid_from_ts")) \
                          .withColumn("valid_from_day", dayofmonth("valid_from_ts"))
-
+    
     
     df_transformed = df_transformed.withColumn("creazione_dta_raw", trim(col("creazione_dta"))) \
                .withColumn("creazione_dta_raw", when(col("creazione_dta_raw") == "", None).otherwise(col("creazione_dta_raw")))
@@ -116,6 +132,8 @@ def run_job_header(spark, read_path, write_path, discarded_path):
         # fallback su ISO yyyy-MM-dd
         expr("coalesce(to_date(creazione_dta_raw, 'M/d/yyyy'), to_date(creazione_dta_raw, 'yyyy-MM-dd'))")
     )
+    end_ts_transform = datetime.utcnow().isoformat()
+    duration_s_transform = (datetime.fromisoformat(end_ts_transform) - datetime.fromisoformat(start_ts_transform)).total_seconds()
 
     print("AFTER TRANSFORM PHASE:")
     df_transformed.show(truncate=False)
@@ -133,7 +151,7 @@ def run_job_header(spark, read_path, write_path, discarded_path):
     ## Fase B (insert versions) inseriamo tutte le version rows (una per evento intrabatch). 
      #### L’inserimento è idempotente (merge su contratto_cod + valid_from)
 
-
+    start_ts_merge = datetime.utcnow().isoformat()
     if not DeltaTable.isDeltaTable(spark, write_path):
         print("INIT DELTA TABLE")
         df_transformed.write.partitionBy(partition_columns).format("delta").save(write_path)
@@ -258,6 +276,8 @@ def run_job_header(spark, read_path, write_path, discarded_path):
         }
     ).execute()
 
+    staged_count = staged.count() if 'staged' in locals() else None
+
     written_delta_table = spark.read.format("delta").load(write_path)
 
     written_delta_table.show(truncate=False)
@@ -270,9 +290,50 @@ def run_job_header(spark, read_path, write_path, discarded_path):
     closed_count = written_delta_table.filter(col("closed_by_batch") == batch_id).count()
     print("closed_count: ", closed_count)
 
+    end_ts = datetime.utcnow().isoformat()
+    duration_s_merge = (datetime.fromisoformat(end_ts) - datetime.fromisoformat(start_ts_merge)).total_seconds()
+    duration_s = (datetime.fromisoformat(end_ts) - datetime.fromisoformat(start_ts)).total_seconds()
+    
+
     print("MERGE COMPLETATO (intraday versions gestite).")
 
-    
+    app_id = spark.sparkContext.applicationId
+    ui_url = spark.sparkContext.uiWebUrl    # es. http://manager-host:4040
+
+    resp = requests.get(f"{ui_url}/api/v1/applications/{app_id}/executors")
+    if resp.ok:
+        executors_info = resp.json()
+        for exe in executors_info:
+            print("Executor ID:", exe.get("id"))
+            print("  Memory Used (MB):", exe.get("memoryUsed"))
+            print("  Total Cores:", exe.get("totalCores"))
+            print("  Host Port:", exe.get("hostPort"))
+            print("  isDriver:", exe.get("isDriver"))
+            print("---------")
+    else:
+        print("Errore nel recuperare dati executors")
+
+    run_metrics = {
+        "executors_info": executors_info,
+        "batch_id": batch_id,
+        "duration_s": duration_s,
+        "duration_s_extract": duration_s_extract,
+        "duration_s_validation": duration_s_validation,
+        "duration_s_transform": duration_s_transform,
+        "duration_s_merge": duration_s_merge,
+        "staged_count": int(staged_count) if staged_count is not None else None,
+        "inserted_count": int(inserted_count),
+        "closed_count": int(closed_count),
+        "spark_app_id": spark.sparkContext.applicationId if spark and spark.sparkContext else None,
+        "spark_ui_url": getattr(spark.sparkContext, "uiWebUrl", None) if spark and spark.sparkContext else None
+    }
+
+    for k,v in dq_metrics.items():
+        run_metrics[f"dq_{k}"] = v
+
+    # WRITING METRICS
+    write_run_metrics_spark(spark, run_metrics, metrics_path)
+
 
 if __name__ == '__main__':
 
@@ -295,10 +356,10 @@ if __name__ == '__main__':
 
     #### PATH DEFINITIONS:
     table_name = "header/"
-
     
     ### WRITE:
     write_path = base_write_path + "landing/" + table_name
     discarded_path = base_write_path + "discarded/" + table_name
+    metrics_path = base_write_path + "metrics/"
   
-    run_job_header(spark, read_path, write_path, discarded_path)
+    run_job_header(spark, read_path, write_path, discarded_path, metrics_path)

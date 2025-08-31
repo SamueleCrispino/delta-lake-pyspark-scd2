@@ -120,14 +120,25 @@ def validation(extracted_df, deduplication_keys, spark,
     ).collect()[0].asDict()
 
     total = extracted_df.count()  # un unico count (opzionale: si può anche calcolarlo da somme)
-    metrics_values = [(total, metrics_agg["kept"], metrics_agg["discarded"],
-                       metrics_agg["duplicates_older"], metrics_agg["null_key"], metrics_agg["batch_date_mismatch"])]
-    metrics_schema = ["total", "kept", "discarded", "duplicates_older", "null_key", "batch_date_mismatch"]
 
-    metrics_df = spark.createDataFrame(metrics_values, metrics_schema)
-    metrics_df.show(truncate=False)
+    dq_metrics = {
+        "batch_date": batch_date_str,
+        "total": int(total),
+        "kept": int(metrics_agg["kept"]),
+        "discarded": int(metrics_agg["discarded"]),
+        "duplicates_older": int(metrics_agg["duplicates_older"]),
+        "null_key": int(metrics_agg["null_key"]),
+        "batch_date_mismatch": int(metrics_agg["batch_date_mismatch"])
+    }
     
-    metrics_df.write.mode("append").json(f"metrics/{batch_id}/")
+    #metrics_values = [(total, metrics_agg["kept"], metrics_agg["discarded"],
+    #                   metrics_agg["duplicates_older"], metrics_agg["null_key"], metrics_agg["batch_date_mismatch"])]
+    #metrics_schema = ["total", "kept", "discarded", "duplicates_older", "null_key", "batch_date_mismatch"]
+#
+    #metrics_df = spark.createDataFrame(metrics_values, metrics_schema)
+    #metrics_df.show(truncate=False)
+    #
+    #metrics_df.write.mode("append").json(f"metrics/{batch_id}/")
 
     # ---------------------------------------------------
     # 8) pulizia colonne interne e ritorno kept_clean
@@ -136,4 +147,4 @@ def validation(extracted_df, deduplication_keys, spark,
     # mantieni input_file_name se ti serve in seguito; altrimenti puoi dropparla qui
     kept_clean = kept.drop(*[c for c in cols_to_drop if c in kept.columns])
 
-    return kept_clean
+    return kept_clean, dq_metrics

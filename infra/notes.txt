@@ -54,6 +54,14 @@ ssh-copy-id -i ~/.ssh/id_rsa.pub Crispinoadmin@13.93.4.139
 ssh-copy-id -i ~/.ssh/id_rsa.pub Crispinoadmin@13.93.4.240
 ssh-copy-id -i ~/.ssh/id_rsa.pub Crispinoadmin@13.93.5.195
 
+
+#### Con il cluster spento
+cd ~
+wget https://archive.apache.org/dist/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz
+tar -xvf spark-3.5.0-bin-hadoop3.tgz
+sudo mv spark-3.5.0-bin-hadoop3 /opt/spark
+source ~/.bashrc  <--- export SPARK_HOME=/opt/spark
+
 cd /opt/spark/sbin
 # cambiare proprietario cartella logs
 sudo chown -R Crispinoadmin:Crispinoadmin /opt/spark/logs
@@ -62,8 +70,8 @@ for worker in $(cat workers.txt); do ssh Crispinoadmin@$worker "sudo mkdir -p /o
 
 cd /opt/spark/conf
 sudo cp spark-env.sh.template spark-env.sh
-nano spark-env.sh  # <--- export SPARK_WORKER_DIR=/data/spark_work
-sudo mkdir -p /data/spark_work
+nano spark-env.sh  # <--- export SPARK_WORKER_DIR=/data/spark_work  OR /tmp/spark_work
+sudo mkdir -p /data/spark_work  
 sudo chown -R Crispinoadmin:Crispinoadmin /data/spark_work
 
 
@@ -98,8 +106,9 @@ ssh Crispinoadmin@13.93.4.139  "cat /opt/spark/conf/spark-env.sh" | grep -i /tmp
 ssh Crispinoadmin@13.93.4.240  "cat /opt/spark/conf/spark-env.sh" | grep -i /tmp/spark_work
 ssh Crispinoadmin@13.93.5.195  "cat /opt/spark/conf/spark-env.sh" | grep -i /tmp/spark_work
 
-/opt/spark/sbin/start-all.sh
 
+/opt/spark/sbin/start-all.sh
+/opt/spark/sbin/stop-master.sh
 
 ####################### CREATING MANAGER ENV ##############################
 python3 -m venv /data/project/venv
@@ -119,6 +128,10 @@ git clone <il_tuo_repo_git> project || true
 sudo chown -R Crispinoadmin:Crispinoadmin /data/project
 
 
+# Granting permissions to all workers to /data/delta/
+for worker in $(cat workers.txt); do ssh Crispinoadmin@$worker "sudo mkdir -p /data/delta/ && sudo chown -R Crispinoadmin:Crispinoadmin /data/delta/"; done
+
+
 ##### RUNNING
 # dal manager
 source /data/delta-lake-pyspark-scd2/venv/bin/activate  # opzionale, ma utile per aver python nel PATH
@@ -128,14 +141,15 @@ export PYSPARK_DRIVER_PYTHON=/data/delta-lake-pyspark-scd2/venv/bin/python
 
 # spark-submit con jar delta (usiamo --packages per scaricarlo)
 $SPARK_HOME/bin/spark-submit \
-  --master spark://13.93.5.130:7077 \
+  --master spark://10.0.1.7:7077 \
   --deploy-mode client \
   --conf "spark.sql.legacy.timeParserPolicy=CORRECTED" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
   --packages io.delta:delta-spark_2.12:3.1.0 \
   /data/delta-lake-pyspark-scd2/header_etl.py \
-  --read-path /data/delta-lake-pyspark-scd2/crm_with_event_time/header/header_20230122.csv \
-  --write-path /data/delta/landing/header
+  /data/delta-lake-pyspark-scd2/crm_with_event_time/header/header_20230122.csv \
+  /data/delta/landing/
+
 
 # NOTA: Importante: usa PYSPARK_PYTHON per far usare il python del virtualenv. --packages farà scaricare il JAR delta-spark al primo run.
 
@@ -150,29 +164,6 @@ lancia spark-submit redirectando stdout/stderr a un log file
 legge counts da Delta (inserted_count, closed_count) come fai già
 
 scrive una riga CSV/JSON in /data/project/runs/runs_metrics.csv con: run_id, start_ts, end_ts, duration_s, nodes_used, staged_count, inserted_count, closed_count, staged_count, error_flag, spark_ui_url
-
-Esempio minimale:
-
-#!/usr/bin/env bash
-START=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-RUN_ID=$(date +"%Y%m%d%H%M%S")
-LOG="/data/project/runs/log_${RUN_ID}.log"
-
-# lancia job
-spark-submit ... > ${LOG} 2>&1
-RC=$?
-
-END=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-# estrai metriche via pyspark oppure via spark-sql
-python3 <<PY
-from pyspark.sql import SparkSession
-s = SparkSession.builder.appName('metrics_reader').getOrCreate()
-df = s.read.format('delta').load('/data/delta/landing/header')
-inserted = df.filter(df.batch_id == '${RUN_ID}').count()
-print("${RUN_ID},${START},${END},${inserted},${RC}")
-s.stop()
-PY
 
 
 
