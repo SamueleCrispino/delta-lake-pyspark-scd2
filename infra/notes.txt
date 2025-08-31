@@ -149,7 +149,7 @@ $SPARK_HOME/bin/spark-submit \
   --conf "spark.local.dir=/tmp/spark_local" \
   /data/delta-lake-pyspark-scd2/header_etl.py \
   /data/crm_with_event_time/header/header_20230127.csv \
-  /data/delta/landing/
+  /data/delta/
 
 
 # NOTA: Importante: usa PYSPARK_PYTHON per far usare il python del virtualenv. --packages farà scaricare il JAR delta-spark al primo run.

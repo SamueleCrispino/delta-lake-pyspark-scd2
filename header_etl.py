@@ -301,21 +301,20 @@ def run_job_header(spark, read_path, write_path, discarded_path, metrics_path):
     app_id = spark.sparkContext.applicationId
     ui_url = spark.sparkContext.uiWebUrl    # es. http://manager-host:4040
 
-    resp = requests.get(f"{ui_url}/api/v1/applications/{app_id}/executors")
-    if resp.ok:
-        executors_info = resp.json()
-        for exe in executors_info:
-            print("Executor ID:", exe.get("id"))
-            print("  Memory Used (MB):", exe.get("memoryUsed"))
-            print("  Total Cores:", exe.get("totalCores"))
-            print("  Host Port:", exe.get("hostPort"))
-            print("  isDriver:", exe.get("isDriver"))
-            print("---------")
-    else:
-        print("Errore nel recuperare dati executors")
+    #resp = requests.get(f"{ui_url}/api/v1/applications/{app_id}/executors")
+    #if resp.ok:
+    #    executors_info = resp.json()
+    #    for exe in executors_info:
+    #        print("Executor ID:", exe.get("id"))
+    #        print("  Memory Used (MB):", exe.get("memoryUsed"))
+    #        print("  Total Cores:", exe.get("totalCores"))
+    #        print("  Host Port:", exe.get("hostPort"))
+    #        print("  isDriver:", exe.get("isDriver"))
+    #        print("---------")
+    #else:
+    #    print("Errore nel recuperare dati executors")
 
     run_metrics = {
-        "executors_info": executors_info,
         "batch_id": batch_id,
         "duration_s": duration_s,
         "duration_s_extract": duration_s_extract,
@@ -364,6 +363,6 @@ if __name__ == '__main__':
     ### WRITE:
     write_path = base_write_path + "landing/" + table_name
     discarded_path = base_write_path + "discarded/" + table_name
-    metrics_path = base_write_path + "metrics/"
+    metrics_path = base_write_path + "metrics/" + table_name
   
     run_job_header(spark, read_path, write_path, discarded_path, metrics_path)
