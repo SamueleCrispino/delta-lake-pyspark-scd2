@@ -9,7 +9,8 @@ $SPARK_HOME/bin/spark-submit \
   --master spark://10.0.1.7:7077 \
   --deploy-mode client \
   --conf "spark.sql.legacy.timeParserPolicy=CORRECTED" \
-  /data/delta-lake-pyspark-scd2/tools/generate_header_datasets.py \
+  --conf "spark.local.dir=/tmp/spark_local" \
+  /data/delta-lake-pyspark-scd2/utils/generate_header_datasets.py \
   --size 1000000 \
   --outdir /data/crm_with_event_time/header \
   --partitions 32 \
@@ -84,7 +85,7 @@ def generate_batch1(spark, n_rows: int, batch_date: datetime.date, outpath: str,
     ]
     df = spark.createDataFrame([Row(**dict(zip(cols, r))) for r in data])
     # repartition and write to directory named outpath (e.g. .../header_20230127.csv)
-    df.repartition(partitions).write.mode("overwrite").option("header", True).csv(outpath)
+    df.repartition(partitions).write.mode("overwrite").option("header", True).option("sep", "|").csv(outpath)
     print(f"Written batch1 to {outpath} (rows={n_rows})")
 
 def generate_batch2(spark, n_rows: int, batch_date: datetime.date, outpath: str, partitions: int, seed: int,
@@ -118,7 +119,7 @@ def generate_batch2(spark, n_rows: int, batch_date: datetime.date, outpath: str,
         "codice_agente", "status_quote", "creazione_dta", "event_time"
     ]
     df = spark.createDataFrame([Row(**dict(zip(cols, r))) for r in data])
-    df.repartition(partitions).write.mode("overwrite").option("header", True).csv(outpath)
+    df.repartition(partitions).write.mode("overwrite").option("header", True).option("sep", "|").csv(outpath)
     print(f"Written batch2 to {outpath} (rows={n_rows}, pct_new={pct_new})")
 
 def parse_yyyymmdd(s: str) -> datetime.date:

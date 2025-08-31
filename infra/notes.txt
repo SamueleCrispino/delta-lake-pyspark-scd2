@@ -146,8 +146,9 @@ $SPARK_HOME/bin/spark-submit \
   --conf "spark.sql.legacy.timeParserPolicy=CORRECTED" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
   --packages io.delta:delta-spark_2.12:3.1.0 \
+  --conf "spark.local.dir=/tmp/spark_local" \
   /data/delta-lake-pyspark-scd2/header_etl.py \
-  /data/delta-lake-pyspark-scd2/crm_with_event_time/header/header_20230122.csv \
+  /data/crm_with_event_time/header/header_20230127.csv \
   /data/delta/landing/
 
 
