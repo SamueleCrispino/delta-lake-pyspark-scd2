@@ -13,7 +13,7 @@ from pyspark.sql import Window
 import requests
 
 from utils.validations_utils import validation
-from utlis.write_metrics import write_run_metrics_spark
+from utils.write_metrics import write_run_metrics_spark
 
 # DEBUG:
 print("pyspark version: ", pyspark.__version__)
