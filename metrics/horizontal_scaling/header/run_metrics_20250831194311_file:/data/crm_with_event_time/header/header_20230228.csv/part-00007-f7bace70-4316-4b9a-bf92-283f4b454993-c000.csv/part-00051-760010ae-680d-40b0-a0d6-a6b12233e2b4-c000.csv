@@ -1,0 +1,2 @@
+batch_id,duration_s,duration_s_extract,duration_s_validation,duration_s_transform,duration_s_merge,staged_count,inserted_count,closed_count,spark_app_id,spark_ui_url,dq_batch_date,dq_total,dq_kept,dq_discarded,dq_duplicates_older,dq_null_key,dq_batch_date_mismatch
+20250831194311_file:///data/crm_with_event_time/header/header_20230228.csv/part-00007-f7bace70-4316-4b9a-bf92-283f4b454993-c000.csv,44.331934,3.036535,14.138613,0.218506,25.145532,958495,0,261794,app-20250831194309-0003,http://vm-1.internal.cloudapp.net:4040,20230228,1000000,958495,41505,4,0,41501
