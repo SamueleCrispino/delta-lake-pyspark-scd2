@@ -110,7 +110,6 @@ for size in "${SIZES[@]}"; do
       --outdir "${OUTDIR}" \
       --partitions "${PARTITIONS}" \
       --pct_new "${PCT_NEW}" \
-      --pct_multi_event "${PCT_MULTI_EVENT}" \
       --seed "${SEED}" \
       --batch1_date "${BATCH1_DATE}" \
       --batch2_date "${BATCH2_DATE}" \
