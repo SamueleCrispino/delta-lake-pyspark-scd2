@@ -80,15 +80,15 @@ for size in "${SIZES[@]}"; do
   # --- CLEAN input header files (optional)
   if [ "${CLEAN_INPUT_BEFORE_GENERATE}" = true ]; then
     echo "Cleaning input folder: ${OUTDIR} (preserve metrics)" | tee -a "${ITER_DIR}/run.log"
-    # remove only files in header dir
-    sudo rm -rf "${OUTDIR}/header_${BATCH1_DATE}.csv"* || true
-    sudo rm -rf "${OUTDIR}/header_${BATCH2_DATE}.csv"* || true
-    # if generate writes partitioned csv folders (header_YYYYMMDD.csv/part-...), remove them:
-    sudo rm -rf "${OUTDIR}/header_${BATCH1_DATE}.csv" || true
-    sudo rm -rf "${OUTDIR}/header_${BATCH2_DATE}.csv" || true
-    # ensure dir exists
-    mkdir -p "${OUTDIR}"
+    # rimuove TUTTO sotto OUTDIR in modo sicuro; l'espansione ${OUTDIR:?} evita rm -rf / se OUTDIR è vuoto
+    sudo rm -rf "${OUTDIR:?}/"* || true
+    # ricrea la directory (se non esiste ancora)
+    sudo mkdir -p "${OUTDIR}"
+    # sistema ownership/permessi se necessario (opzionale, decommenta se vuoi)
+    # sudo chown -R Crispinoadmin:Crispinoadmin "${OUTDIR}"
+    # sudo chmod -R 2775 "${OUTDIR}"
   fi
+
 
   # --- CLEAN delta landing/discarded (but keep metrics if configured)
   if [ "${CLEAN_DELTA_BEFORE_RUN}" = true ]; then
