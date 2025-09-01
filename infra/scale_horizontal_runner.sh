@@ -140,7 +140,7 @@ while true; do
 
   # --- 4) stop cluster
   echo "Stopping Spark cluster..."
-  sudo "${SPARK_HOME}/sbin/stop-all.sh"
+  "${SPARK_HOME}/sbin/stop-all.sh"
   sleep "${WAIT_AFTER_STOP}"
 
   # --- 5) remove last active worker from workers file (so next run has one fewer)
