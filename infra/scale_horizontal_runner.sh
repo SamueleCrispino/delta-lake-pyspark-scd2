@@ -99,10 +99,10 @@ while true; do
 
   # --- 3) start cluster (ensure a clean start)
   echo "Stopping any running cluster (safe)..."
-  sudo "${SPARK_HOME}/sbin/stop-all.sh" || true
+  "${SPARK_HOME}/sbin/stop-all.sh" || true
   sleep 2
   echo "Starting Spark cluster..."
-  sudo "${SPARK_HOME}/sbin/start-all.sh"
+  "${SPARK_HOME}/sbin/start-all.sh"
   echo "Waiting ${WAIT_AFTER_START}s for cluster to settle..."
   sleep "${WAIT_AFTER_START}"
 
