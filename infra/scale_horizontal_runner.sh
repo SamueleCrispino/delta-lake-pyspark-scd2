@@ -3,17 +3,7 @@ set -euo pipefail
 
 ###########################
 # scale_horizontal_runner.sh
-# Automatizza i test di scaling orizzontale:
-# - pulisce dati
-# - start cluster
-# - esegue 2 spark-submit
-# - stop cluster
-# - rimuove (commenta) ultimo worker dal file /opt/spark/conf/workers
-# ripete finché non ci sono più workers attivi
-#
-# USO: esegui sul Manager (es. 10.0.1.7)
-# prima: sudo cp /opt/spark/conf/workers /opt/spark/conf/workers.bak
-#
+# Versione semplificata (workers file contiene solo IP per riga)
 ###########################
 
 ### CONFIGURA QUI (modifica secondo ambiente) ###
@@ -75,8 +65,8 @@ while true; do
   echo
   echo "=== ITERATION ${iteration} === $(date -u +%FT%TZ)"
 
-  # read active (non-commented, non-empty) workers
-  mapfile -t active_workers < <(grep -E -v '^\s*#' "${WORKERS_FILE}" | sed '/^\s*$/d' || true)
+  # read active (non-empty) workers (strip whitespace)
+  mapfile -t active_workers < <(awk 'NF{print $1}' "${WORKERS_FILE}" || true)
   if [ "${#active_workers[@]}" -eq 0 ]; then
     echo "No active workers left -> finished."
     break
@@ -87,36 +77,39 @@ while true; do
 
   # --- 1) CLEAN target dirs (run data)
   echo "Cleaning previous run data (landing/discarded partitions)..."
-  # usa sudo se /data è owned da root/nobody
-  sudo rm -rf "${WRITE_BASE}/landing/header/*" || true
-  sudo rm -rf "${WRITE_BASE}/discarded/header/*" || true
+  if [ -d "${WRITE_BASE}/landing/header" ]; then
+    sudo rm -rf "${WRITE_BASE}/landing/header/"* || true
+  fi
+  if [ -d "${WRITE_BASE}/discarded/header" ]; then
+    sudo rm -rf "${WRITE_BASE}/discarded/header/"* || true
+  fi
 
-  # --- 2) ensure workers file contains exactly active_workers + original commented lines
-  # keep commented lines at end to preserve history
-  commented_lines=$(grep -E '^\s*#' "${WORKERS_FILE}" || true)
+  # --- 2) ensure workers file contains exactly active_workers (we already have it)
+  # rewrite canonical workers file (this is idempotent)
   tmp_workers=$(mktemp)
   for w in "${active_workers[@]}"; do
     printf "%s\n" "${w}" >> "${tmp_workers}"
   done
-  if [ -n "${commented_lines}" ]; then
-    printf "%s\n" "${commented_lines}" >> "${tmp_workers}"
-  fi
   echo "Installing workers file (current active workers)..."
   sudo cp "${tmp_workers}" "${WORKERS_FILE}"
+  sudo chown root:root "${WORKERS_FILE}" || true
+  sudo chmod 644 "${WORKERS_FILE}" || true
   rm -f "${tmp_workers}"
 
-  # --- 3) start cluster
+  # --- 3) start cluster (ensure a clean start)
+  echo "Stopping any running cluster (safe)..."
+  sudo "${SPARK_HOME}/sbin/stop-all.sh" || true
+  sleep 2
   echo "Starting Spark cluster..."
   sudo "${SPARK_HOME}/sbin/start-all.sh"
   echo "Waiting ${WAIT_AFTER_START}s for cluster to settle..."
   sleep "${WAIT_AFTER_START}"
 
-  # optional: dump list of nodes from master UI (if accessible)
-  echo "Master URL: ${MASTER_URL}"
-  echo "Running batch1 (initial load)..."
+  # iteration logdir
   LOGDIR_ITER="${LOGDIR}/iter_${iteration}"
   mkdir -p "${LOGDIR_ITER}"
 
+  echo "Running batch1 (initial load)..."
   # run batch1
   "${SPARK_SUBMIT_COMMON[@]}" \
     "${BASE_PROJECT_DIR}/header_etl.py" \
@@ -124,7 +117,6 @@ while true; do
     "${WRITE_BASE}" \
     > "${LOGDIR_ITER}/batch1.stdout.log" 2> "${LOGDIR_ITER}/batch1.stderr.log" || {
       echo "batch1 failed; see ${LOGDIR_ITER}/batch1.stderr.log"
-      # continue to stop cluster and proceed with next iteration
   }
 
   echo "Running batch2 (merge)..."
@@ -137,20 +129,20 @@ while true; do
   }
 
   # collect some logs: list landing files count etc
-  echo "Listing landing content (sample):" > "${LOGDIR_ITER}/summary.txt"
-  echo "landing files:" >> "${LOGDIR_ITER}/summary.txt"
-  sudo ls -R "${WRITE_BASE}/landing/header" >> "${LOGDIR_ITER}/summary.txt" 2>&1 || true
-  echo >> "${LOGDIR_ITER}/summary.txt"
-  echo "discarded files:" >> "${LOGDIR_ITER}/summary.txt"
-  sudo ls -R "${WRITE_BASE}/discarded/header" >> "${LOGDIR_ITER}/summary.txt" 2>&1 || true
+  {
+    echo "Listing landing content (sample):"
+    sudo ls -R "${WRITE_BASE}/landing/header" 2>&1 || true
+    echo
+    echo "discarded files:"
+    sudo ls -R "${WRITE_BASE}/discarded/header" 2>&1 || true
+  } > "${LOGDIR_ITER}/summary.txt"
 
   # --- 4) stop cluster
   echo "Stopping Spark cluster..."
   sudo "${SPARK_HOME}/sbin/stop-all.sh"
   sleep "${WAIT_AFTER_STOP}"
 
-  # --- 5) comment out last active worker (so next run has one fewer)
-  # build new workers file with all active except last; preserve commented lines
+  # --- 5) remove last active worker from workers file (so next run has one fewer)
   if [ "${#active_workers[@]}" -le 1 ]; then
     echo "Only one active worker left; will remove it and finish after this iteration."
     new_active=()
@@ -163,13 +155,10 @@ while true; do
   for w in "${new_active[@]}"; do
     printf "%s\n" "${w}" >> "${tmp_workers2}"
   done
-  # append original commented lines (if any)
-  if [ -n "${commented_lines}" ]; then
-    printf "%s\n" "${commented_lines}" >> "${tmp_workers2}"
-  fi
-
   echo "Updating workers file to remove last worker for next iteration..."
   sudo cp "${tmp_workers2}" "${WORKERS_FILE}"
+  sudo chown root:root "${WORKERS_FILE}" || true
+  sudo chmod 644 "${WORKERS_FILE}" || true
   rm -f "${tmp_workers2}"
 
   echo "Iteration ${iteration} completed. Logs: ${LOGDIR_ITER}"
