@@ -131,7 +131,7 @@ for size in "${SIZES[@]}"; do
       echo "batch1 failed for size ${size}; see ${ITER_DIR}/batch1.stderr.log" | tee -a "${ITER_DIR}/run.log"
       # continue to try batch2 (or skip) — depends on policy; here we'll continue
   }
-
+###
   sleep "${SLEEP_AFTER_ETL}"
 
   # --- 3) RUN header_etl on batch2 (merge)
