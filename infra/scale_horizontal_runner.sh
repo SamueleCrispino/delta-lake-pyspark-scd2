@@ -49,6 +49,7 @@ confirm() {
   esac
 }
 
+##
 if ! confirm "Vuoi procedere? (modifica le variabili nello script se necessario)"; then
   echo "Aborted by user."
   exit 1
