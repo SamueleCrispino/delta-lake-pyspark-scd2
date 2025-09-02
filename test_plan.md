@@ -117,3 +117,17 @@ Utilizzo risorse (se satura CPU o memoria)
     "engineInfo": "Apache-Spark/3.5.0 Delta-Lake/3.1.0"
   }
 ]
+
+
+export SPARK_HOME=/opt/spark
+
+$SPARK_HOME/bin/spark-submit \
+  --master spark://10.0.1.7:7077 \
+  --deploy-mode client \
+  --conf "spark.sql.legacy.timeParserPolicy=CORRECTED" \
+  --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
+  --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
+  --packages io.delta:delta-spark_2.12:3.1.0 \
+  /data/delta-lake-pyspark-scd2/schema_evolution_step1.py \
+    --delta_path /data/delta/landing/header \
+    --metrics_base /data/delta/metrics/schema_evolution

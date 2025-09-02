@@ -94,7 +94,6 @@ def query_spark_ui(ui_url: str, app_id: str) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="Schema evolution step 1 automation: mergeSchema append + metrics")
     parser.add_argument("--delta_path", required=True, help="Delta table path (e.g. /data/delta/landing/header)")
-    parser.add_argument("--sample_csv", required=True, help="CSV to read and append as sample (will be augmented with new column)")
     parser.add_argument("--metrics_base", default="/data/delta/metrics/schema_evolution", help="where to place metrics csvs")
     parser.add_argument("--csv_sep", default="|", help="CSV separator for sample_csv (default '|')")
     parser.add_argument("--new_col", default="risk_score", help="name of the new nullable column to add")
@@ -138,7 +137,7 @@ def main():
         result["version_before"] = version_before
 
         # measure write: read sample CSV, add column, append with mergeSchema
-        sample_df = spark.read.option("header", True).option("sep", args.csv_sep).csv(args.sample_csv)
+        sample_df = spark.read.format("delta").option("versionAsOf", version_before).load(args.delta_path).limit(100)
         sample_df = sample_df.withColumn(args.new_col, lit(None).cast(StringType()))
 
         t0 = time.time()
