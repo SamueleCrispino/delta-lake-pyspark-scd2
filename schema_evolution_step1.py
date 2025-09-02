@@ -51,7 +51,8 @@ def atomic_single_csv_write(spark, record: dict, out_dir: str, filename: str) ->
     final_path = os.path.join(out_dir, filename)
 
     # create DF and write
-    df = spark.createDataFrame([record])
+    safe_record = {k: str(v) if v is not None else "" for k, v in record.items()}
+    df = spark.createDataFrame([safe_record])
     df.coalesce(1).write.option("header", True).mode("overwrite").csv(tmp_dir)
 
     # find part file
