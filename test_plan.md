@@ -83,3 +83,37 @@ Utilizzo risorse (se satura CPU o memoria)
  Risultati confrontati (scalabilità orizzontale vs verticale)
 
  !!!! Eseguire anche valutazione da UI
+
+
+ ########### SCHEMA EVOLUTION TESTS  #########
+
+[
+  {
+    "version": 0,
+    "timestamp": "2025-09-02 16:46:02.784",
+    "userId": null,
+    "userName": null,
+    "operation": "WRITE",
+    "operationParameters": {
+      "mode": "ErrorIfExists",
+      "partitionBy": [
+        "valid_from_year",
+        "valid_from_month",
+        "valid_from_day"
+      ]
+    },
+    "job": null,
+    "notebook": null,
+    "clusterId": null,
+    "readVersion": null,
+    "isolationLevel": "Serializable",
+    "isBlindAppend": true,
+    "operationMetrics": {
+      "numFiles": 67,
+      "numOutputRows": 9583937,
+      "numOutputBytes": 298645277
+    },
+    "userMetadata": null,
+    "engineInfo": "Apache-Spark/3.5.0 Delta-Lake/3.1.0"
+  }
+]
