@@ -1,0 +1,50 @@
+import argparse
+import time
+import os
+from datetime import datetime
+import pandas as pd
+from pyspark.sql import SparkSession
+
+def main(args):
+    spark = SparkSession.builder.appName("PartitioningTest").getOrCreate()
+
+    # timestamp per i file di output
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # output dir
+    metrics_dir = "/data/delta/metrics/partitioning_metrics"
+    os.makedirs(metrics_dir, exist_ok=True)
+    metrics_file = os.path.join(metrics_dir, f"partitioning_{ts}.csv")
+
+    # tabella non partizionata
+    nopart_path = args.nopart_path
+    # tabella partizionata
+    part_path = args.part_path
+
+    # query pesante con filtro temporale
+    where_clause = "valid_from_year = 2023 AND valid_from_month BETWEEN 1 AND 6 AND is_current is false"
+
+    def run_query(table_path, tag):
+        query = f"SELECT COUNT(*) FROM delta.`{table_path}` WHERE {where_clause}"
+        start = time.time()
+        res = spark.sql(query).collect()[0][0]
+        dur = time.time() - start
+        return {"table": tag, "result": res, "duration_sec": dur, "query": query}
+
+    # run su entrambe le versioni
+    metrics = []
+    metrics.append(run_query(nopart_path, "nopartition"))
+    metrics.append(run_query(part_path, "partitioned"))
+
+    # salva metriche in CSV
+    pd.DataFrame(metrics).to_csv(metrics_file, index=False)
+    print(f"Metrics saved to {metrics_file}")
+
+    spark.stop()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--nopart_path", required=True, help="Path Delta non partizionata")
+    parser.add_argument("--part_path", required=True, help="Path Delta partizionata")
+    args = parser.parse_args()
+    main(args)

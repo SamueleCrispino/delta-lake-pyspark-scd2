@@ -156,9 +156,10 @@ def run_job_header(spark, read_path, write_path, discarded_path, metrics_path):
     start_ts_merge = datetime.utcnow().isoformat()
     if not DeltaTable.isDeltaTable(spark, write_path):
         print("INIT DELTA TABLE")
-        df_transformed.write.partitionBy(partition_columns).format("delta").save(write_path)
-        
-        return 
+        if partition_columns is not None and len(partition_columns) > 0:
+            df_transformed.write.partitionBy(partition_columns).format("delta").save(write_path)
+        else:
+            df_transformed.write.format("delta").save(write_path)   
 
     print("FOUND DELTA TABLE APPLYING MERGING")
 
@@ -345,6 +346,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         read_path = sys.argv[1]
         base_write_path = sys.argv[2]
+        partition_columns = sys.argv[3].split(",") if len(sys.argv) > 3 else None
     else:
         print("Usage: python header_etl.py <read_path> <base_write_path>")
         sys.exit(1) # Esce se l'argomento non è fornito

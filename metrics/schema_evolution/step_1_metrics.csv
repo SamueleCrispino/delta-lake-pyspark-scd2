@@ -1,0 +1,2 @@
+app_id,delta_path,dir_file_count,dir_size_bytes,error_flag,error_message,new_column,read_after_count,read_after_duration_s,read_prev_count,read_prev_duration_s,run_id,spark_ui_url,timestamp_utc,version_after,version_before,write_duration_s
+app-20250902205233-0001,/data/delta/landing/header,148,301170919,0,"",risk_score_3,9584237,0.3937187194824219,9584137,1.5517613887786865,schema_step1_20250902T205232Z,http://vm-1.internal.cloudapp.net:4040,2025-09-02T20:52:33.463227,3,2,7.878423690795898
