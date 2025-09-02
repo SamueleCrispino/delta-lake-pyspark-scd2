@@ -2,6 +2,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, expr, rand
 import random
 import datetime
+from pyspark.sql.functions import expr, concat, lpad, floor, rand, col, lit, to_timestamp, unix_timestamp
+from pyspark.sql import DataFrame
 
 """
 export SPARK_HOME=/opt/spark
@@ -32,6 +34,71 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType
 from pyspark.sql import Row
 import pytz
+
+
+def make_header_df_from_range(spark, n_rows: int, date_for_event: datetime.date,
+                              partitions: int, seed: int,
+                              tipi_contratto, status_quote) -> DataFrame:
+    """
+    Genera dataframe distribuito con n_rows righe usando spark.range.
+    event_time in ISO +01:00 con secondi casuali.
+    """
+    # set seed for reproducibility of rand()
+    df = spark.range(0, n_rows).repartition(partitions)
+
+    # contratto_cod like C00000001 (8 digits)
+    df = df.withColumn("contratto_cod", concat(lit("C"), lpad(col("id").cast("string"), 8, "0")))
+
+    # ordine_sap: 3000000000 + id
+    df = df.withColumn("codice_ordine_sap", (lit(3000000000) + col("id")).cast("string"))
+
+    # tipo_contratto: pick by hashing id
+    df = df.withColumn("tipo_contratto", expr(f"array('{','.join(tipi_contratto)}')[cast(id % {len(tipi_contratto)} as int)]"))
+
+    # codice_opec
+    df = df.withColumn("codice_opec", expr("concat('OPEC', lpad(cast(id % 1000 as string), 4, '0'))"))
+
+    # data_firma and creazione_dta: use date_for_event minus random days
+    base_date = date_for_event.strftime("%Y-%m-%d")
+    # random day offsets
+    df = df.withColumn("rand1", floor(rand(seed + 1) * 366).cast("int"))
+    df = df.withColumn("rand2", floor(rand(seed + 2) * 31).cast("int"))
+    df = df.withColumn("data_firma", expr(f"date_add('{base_date}', -rand1)"))
+    df = df.withColumn("creazione_dta", expr("date_add(data_firma, -cast(rand2 as int))"))
+
+    # net_amount
+    df = df.withColumn("net_amount", (floor(rand(seed+3) * (50000-1000) * 100) / 100).cast("string"))
+
+    df = df.withColumn("causale_annullamento", lit(""))
+    df = df.withColumn("data_annullamento", lit(""))
+
+    df = df.withColumn("codice_agente", expr("cast(10000 + cast(id % 500 as int) as string)"))
+
+    # status_quote pick by modular index
+    df = df.withColumn("status_quote", expr(f"array('{','.join(status_quote)}')[cast(id % {len(status_quote)} as int)]"))
+
+    # event_time: choose hour/min/sec randomly, build ISO with +01:00
+    df = df.withColumn("hour", floor(rand(seed+4) * 24).cast("int"))
+    df = df.withColumn("minute", floor(rand(seed+5) * 60).cast("int"))
+    df = df.withColumn("second", floor(rand(seed+6) * 60).cast("int"))
+
+    df = df.withColumn("HH", lpad(col("hour").cast("string"), 2, "0"))
+    df = df.withColumn("MM", lpad(col("minute").cast("string"), 2, "0"))
+    df = df.withColumn("SS", lpad(col("second").cast("string"), 2, "0"))
+
+    # Build ISO string like 2023-01-27T14:23:05.000+01:00
+    df = df.withColumn("event_time",
+        concat(lit(date_for_event.strftime("%Y-%m-%dT")), col("HH"), lit(":"), col("MM"), lit(":"), col("SS"), lit(".000+01:00"))
+    )
+
+    # select final columns
+    out_cols = [
+        "contratto_cod", "codice_ordine_sap", "tipo_contratto", "codice_opec",
+        "data_firma", "net_amount", "causale_annullamento", "data_annullamento",
+        "codice_agente", "status_quote", "creazione_dta", "event_time"
+    ]
+    df_out = df.select(*out_cols)
+    return df_out
 
 def iso_with_tz(dt: datetime.datetime, tz_offset_hours: int = 1) -> str:
     tz = datetime.timezone(datetime.timedelta(hours=tz_offset_hours))
@@ -69,58 +136,56 @@ def make_row(contratto_cod, i, date_for_event: datetime.date, hour: int, tipi_co
         event_time
     )
 
-def generate_batch1(spark, n_rows: int, batch_date: datetime.date, outpath: str, partitions: int, seed: int,
+def generate_batch1_distributed(spark, n_rows: int, batch_date: datetime.date, outpath: str, partitions: int, seed: int,
                     tipi_contratto, status_quote):
-    random.seed(seed)
-    data = []
-    for i in range(n_rows):
-        contratto_cod = f"C{i:08d}"
-        hour = random.randint(0, 23)
-        data.append(make_row(contratto_cod, i, batch_date, hour, tipi_contratto, status_quote))
-
-    cols = [
-        "contratto_cod", "codice_ordine_sap", "tipo_contratto", "codice_opec",
-        "data_firma", "net_amount", "causale_annullamento", "data_annullamento",
-        "codice_agente", "status_quote", "creazione_dta", "event_time"
-    ]
-    df = spark.createDataFrame([Row(**dict(zip(cols, r))) for r in data])
-    # repartition and write to directory named outpath (e.g. .../header_20230127.csv)
-    df.repartition(partitions).write.mode("overwrite").option("header", True).option("sep", "|").csv(outpath)
+    df = make_header_df_from_range(spark, n_rows, batch_date, partitions, seed, tipi_contratto, status_quote)
+    # write: keep same pattern, use overwrite
+    df.write.mode("overwrite").option("header", True).option("sep", "|").csv(outpath)
     print(f"Written batch1 to {outpath} (rows={n_rows})")
 
-def generate_batch2(spark, n_rows: int, batch_date: datetime.date, outpath: str, partitions: int, seed: int,
+
+def generate_batch2_distributed(spark, n_rows: int, batch_date: datetime.date, outpath: str, partitions: int, seed: int,
                     existing_count: int, pct_new: float, pct_multi_event: float, tipi_contratto, status_quote):
-    """
-    batch2: generates a mix of new and updates.
-    - existing_count: number of distinct contratto in batch1 (usually = size of batch1)
-    - pct_new: fraction (0..100) of rows that are new contratto (Nxxxxx)
-    - pct_multi_event: fraction of rows that create multiple events for same contratto within same batch (simulated by
-      emitting multiple rows for same contratto because selection of existing contratto is random)
-    """
-    random.seed(seed)
-    data = []
-    for i in range(n_rows):
-        r = random.random() * 100
-        if r < pct_new:
-            contratto_cod = f"N{i:08d}"
-            hour = random.randint(0, 23)
-            data.append(make_row(contratto_cod, i, batch_date, hour, tipi_contratto, status_quote))
-        else:
-            # update existing contratto from batch1: pick random index
-            idx = random.randint(0, existing_count - 1)
-            contratto_cod = f"C{idx:08d}"
-            # choose event_time maybe later in day to simulate update
-            hour = random.randint(0, 23)
-            data.append(make_row(contratto_cod, idx, batch_date, hour, tipi_contratto, status_quote))
-            # pct_multi_event already implicitly possible because multiple selections may hit same contratto
-    cols = [
+    # produce a DataFrame that mixes new (N...) and existing (C...) rows.
+    # we'll create two dfs: new_df and updates_df and union them
+    pct_new_frac = float(pct_new) / 100.0
+    new_count = int(round(n_rows * pct_new_frac))
+    update_count = n_rows - new_count
+
+    # new rows
+    new_df = make_header_df_from_range(spark, new_count, batch_date, partitions, seed+10, tipi_contratto, status_quote) \
+                .withColumn("contratto_cod", concat(lit("N"), lpad((col("contratto_cod").substr(2,8)).cast("string"), 8, "0")))
+
+    # updates: pick random ids from 0..existing_count-1
+    updates_df = spark.range(0, update_count).repartition(partitions)
+    updates_df = updates_df.withColumn("idx", floor(rand(seed+20) * existing_count).cast("int"))
+    updates_df = updates_df.withColumn("contratto_cod", concat(lit("C"), lpad(col("idx").cast("string"), 8, "0")))
+    # reuse make_row logic by joining basic attributes from generated df of same size:
+    helper = make_header_df_from_range(spark, update_count, batch_date, partitions, seed+21, tipi_contratto, status_quote) \
+                .select("codice_ordine_sap", "tipo_contratto", "codice_opec", "data_firma",
+                        "net_amount", "causale_annullamento", "data_annullamento",
+                        "codice_agente", "status_quote", "creazione_dta", "event_time")
+    updates_df = updates_df.drop("id")
+    updates_df = updates_df.withColumn("rn", expr("monotonically_increasing_id()")) \
+                           .drop("rn") \
+                           .withColumn("tmp_idx", col("idx"))
+    # attach helper columns by zipping via row_number (simple approach)
+    helper = helper.withColumn("__rid", expr("row_number() over (order by rand())"))
+    updates_df = updates_df.withColumn("__rid", expr("row_number() over (order by rand())"))
+    joined = updates_df.join(helper, on="__rid", how="left").drop("__rid")
+    # final select, keeping contratto_cod from updates and helper columns
+    out_cols = [
         "contratto_cod", "codice_ordine_sap", "tipo_contratto", "codice_opec",
         "data_firma", "net_amount", "causale_annullamento", "data_annullamento",
         "codice_agente", "status_quote", "creazione_dta", "event_time"
     ]
-    df = spark.createDataFrame([Row(**dict(zip(cols, r))) for r in data])
-    df.repartition(partitions).write.mode("overwrite").option("header", True).option("sep", "|").csv(outpath)
+    updates_final = joined.select(*out_cols)
+
+    # union new + updates; ensure count==n_rows by possible adjustment
+    df_out = new_df.unionByName(updates_final).limit(n_rows)
+    df_out.write.mode("overwrite").option("header", True).option("sep", "|").csv(outpath)
     print(f"Written batch2 to {outpath} (rows={n_rows}, pct_new={pct_new})")
+
 
 def parse_yyyymmdd(s: str) -> datetime.date:
     return datetime.datetime.strptime(s, "%Y%m%d").date()
@@ -148,10 +213,10 @@ def main():
     out2 = args.outdir.rstrip("/") + f"/header_{args.batch2_date}.csv"
 
     print("Generating batch1 ...")
-    generate_batch1(spark, args.size, batch1_date, out1, args.partitions, args.seed, tipi_contratto, status_quote)
+    generate_batch1_distributed(spark, args.size, batch1_date, out1, args.partitions, args.seed, tipi_contratto, status_quote)
 
     print("Generating batch2 ...")
-    generate_batch2(spark, args.size, batch2_date, out2, args.partitions, args.seed + 1, args.size, args.pct_new, 0.0, tipi_contratto, status_quote)
+    generate_batch2_distributed(spark, args.size, batch2_date, out2, args.partitions, args.seed + 1, args.size, args.pct_new, 0.0, tipi_contratto, status_quote)
 
     print("Done.")
 
