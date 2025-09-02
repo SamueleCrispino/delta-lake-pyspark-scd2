@@ -1,0 +1,6 @@
+:: loading settings :: url = jar:file:/opt/spark-3.5.0-bin-hadoop3/jars/ivy-2.5.1.jar!/org/apache/ivy/core/settings/ivysettings.xml
+Generating batch1 ...
+Written batch1 to /data/crm_with_event_time/header/header_20230127.csv (rows=100000)
+Generating batch2 ...
+Written batch2 to /data/crm_with_event_time/header/header_20230228.csv (rows=100000, pct_new=50.0)
+Done.

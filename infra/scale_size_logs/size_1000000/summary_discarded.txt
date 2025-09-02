@@ -1,0 +1,3 @@
+total 72
+drwxr-sr-x 3 Crispinoadmin Crispinoadmin 32768 Sep  2 07:36 discarded_20230127
+drwxr-sr-x 3 Crispinoadmin Crispinoadmin 32768 Sep  2 07:37 discarded_20230228

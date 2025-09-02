@@ -1,0 +1,2 @@
+batch_id,duration_s,duration_s_extract,duration_s_validation,duration_s_transform,duration_s_merge,staged_count,inserted_count,closed_count,spark_app_id,spark_ui_url,dq_batch_date,dq_total,dq_kept,dq_discarded,dq_duplicates_older,dq_null_key,dq_batch_date_mismatch
+20250902073406_header_20230127.csv,39.905543,3.041004,14.685215,0.166152,21.168036,95809,0,24410,app-20250902073404-0008,http://vm-1.internal.cloudapp.net:4040,20230127,100000,95809,4191,0,0,4191
