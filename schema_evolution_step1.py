@@ -182,25 +182,6 @@ def main():
         print("Schema after:")
         spark.read.format("delta").load(args.delta_path).printSchema()
 
-        # try to gather Spark UI data (executors, jobs, stages)
-        if ui_url:
-            try:
-                spark_ui_info = query_spark_ui(ui_url, app_id)
-                result["spark_ui_info"] = spark_ui_info
-            except Exception as e:
-                result["spark_ui_info_error"] = str(e)
-        else:
-            result["spark_ui_info"] = None
-
-        # add some aggregate job metrics if available
-        # e.g. count tasks from jobs list
-        try:
-            jobs = result.get("spark_ui_info", {}).get("jobs", [])
-            total_tasks = sum([j.get("numTasks", 0) for j in jobs]) if jobs else None
-            result["spark_total_tasks"] = total_tasks
-        except Exception:
-            result["spark_total_tasks"] = None
-
         # success flag
         result["error_flag"] = 0
         result["error_message"] = None
