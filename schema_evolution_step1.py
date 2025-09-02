@@ -95,7 +95,6 @@ def main():
     parser = argparse.ArgumentParser(description="Schema evolution step 1 automation: mergeSchema append + metrics")
     parser.add_argument("--delta_path", required=True, help="Delta table path (e.g. /data/delta/landing/header)")
     parser.add_argument("--metrics_base", default="/data/delta/metrics/schema_evolution", help="where to place metrics csvs")
-    parser.add_argument("--csv_sep", default="|", help="CSV separator for sample_csv (default '|')")
     parser.add_argument("--new_col", default="risk_score", help="name of the new nullable column to add")
     args = parser.parse_args()
 
@@ -119,7 +118,6 @@ def main():
         "run_id": run_id,
         "timestamp_utc": datetime.utcnow().isoformat(),
         "delta_path": args.delta_path,
-        "sample_csv": args.sample_csv,
         "new_column": args.new_col,
         "app_id": app_id,
         "spark_ui_url": ui_url
