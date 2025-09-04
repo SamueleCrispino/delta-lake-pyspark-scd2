@@ -19,12 +19,12 @@ def main(args):
     part_path = args.part_path
 
     # query pesante con filtro temporale
-    where_clause = "valid_from_year = 2023 AND valid_from_month BETWEEN 1 AND 6 AND is_current is false"
+    where_clause = "valid_from_year = 2023 AND valid_from_month BETWEEN 1 AND 6 AND is_current is true"
 
     def run_query(table_path, tag):
         df = spark.read.format("delta").load(table_path)
         start = time.time()
-        res = df.filter("valid_from_year = 2023 AND valid_from_month BETWEEN 1 AND 6 AND is_current = false").count()
+        res = df.filter("valid_from_year = 2023 AND valid_from_month BETWEEN 1 AND 6 AND is_current = true").count()
         dur = time.time() - start
         return {"table": tag, "result": res, "duration_sec": dur}
 
