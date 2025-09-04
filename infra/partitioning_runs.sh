@@ -16,6 +16,7 @@ LOGDIR=${BASE_PROJECT_DIR}/infra/partitioning_logs
 DATA_DIR=/data
 DELTA_BASE=${DATA_DIR}/delta
 BATCH1_INPUT=${DATA_DIR}/crm_with_event_time/header/header_20230127.csv
+BATCH2_INPUT=${DATA_DIR}/crm_with_event_time/header/header_20230228.csv
 
 HEADER_ETL=${BASE_PROJECT_DIR}/header_etl.py
 PART_TEST=${BASE_PROJECT_DIR}/partitioning_test.py
@@ -72,6 +73,7 @@ for entry in "${SCENARIOS[@]}"; do
   # 2) Lancia header_etl.py (con o senza colonne di partizione)
   echo "[${label}] Running header_etl.py ..."
   if [ -z "${cols}" ]; then
+    echo "[${label}] Running header_etl.py batch 1..."
     "${SPARK_SUBMIT_COMMON[@]}" \
       "${HEADER_ETL}" \
       "${BATCH1_INPUT}" \
@@ -81,10 +83,32 @@ for entry in "${SCENARIOS[@]}"; do
         echo "Skipping partitioning_test for this scenario."
         continue
       }
+    echo "[${label}] Running header_etl.py batch 2..."
+    "${SPARK_SUBMIT_COMMON[@]}" \
+      "${HEADER_ETL}" \
+      "${BATCH2_INPUT}" \
+      "${DELTA_BASE}/" \
+      > "${ITER_DIR}/header_etl.stdout.log" 2> "${ITER_DIR}/header_etl.stderr.log" || {
+        echo "[${label}] header_etl FAILED (see ${ITER_DIR}/header_etl.stderr.log)"
+        echo "Skipping partitioning_test for this scenario."
+        continue
+      }
   else
+    echo "[${label}] Running header_etl.py batch 1..."
     "${SPARK_SUBMIT_COMMON[@]}" \
       "${HEADER_ETL}" \
       "${BATCH1_INPUT}" \
+      "${DELTA_BASE}/" \
+      "${cols}" \
+      > "${ITER_DIR}/header_etl.stdout.log" 2> "${ITER_DIR}/header_etl.stderr.log" || {
+        echo "[${label}] header_etl FAILED (see ${ITER_DIR}/header_etl.stderr.log)"
+        echo "Skipping partitioning_test for this scenario."
+        continue
+      }
+    echo "[${label}] Running header_etl.py batch 2..."
+    "${SPARK_SUBMIT_COMMON[@]}" \
+      "${HEADER_ETL}" \
+      "${BATCH2_INPUT}" \
       "${DELTA_BASE}/" \
       "${cols}" \
       > "${ITER_DIR}/header_etl.stdout.log" 2> "${ITER_DIR}/header_etl.stderr.log" || {
