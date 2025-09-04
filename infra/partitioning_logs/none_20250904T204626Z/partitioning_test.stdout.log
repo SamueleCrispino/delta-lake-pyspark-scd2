@@ -1,0 +1,12 @@
+:: loading settings :: url = jar:file:/opt/spark-3.5.0-bin-hadoop3/jars/ivy-2.5.1.jar!/org/apache/ivy/core/settings/ivysettings.xml
+Traceback (most recent call last):
+  File "/data/delta-lake-pyspark-scd2/partitioning_test.py", line 45, in <module>
+    main(args)
+  File "/data/delta-lake-pyspark-scd2/partitioning_test.py", line 32, in main
+    record = run_query(part_path, "partitioned")
+  File "/data/delta-lake-pyspark-scd2/partitioning_test.py", line 27, in run_query
+    res = spark.sql(query).collect()[0][0]
+  File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/dataframe.py", line 1257, in collect
+  File "/opt/spark/python/lib/py4j-0.10.9.7-src.zip/py4j/java_gateway.py", line 1322, in __call__
+  File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 185, in deco
+pyspark.errors.exceptions.captured.AnalysisException: Table does not support reads: delta.`file:/data/delta/landing/header`.
