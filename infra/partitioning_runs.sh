@@ -98,7 +98,15 @@ for entry in "${SCENARIOS[@]}"; do
 
   # 3) Esegui partitioning_test.py
   echo "[${label}] Running partitioning_test.py ..."
-  python3 "${PART_TEST}" --part_path "${DELTA_BASE}/landing/header" \
+  "${SPARK_HOME}/bin/spark-submit" \
+  --master spark://10.0.1.7:7077 \
+  --deploy-mode client \
+  --conf "spark.sql.legacy.timeParserPolicy=CORRECTED" \
+  --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
+  --packages io.delta:delta-spark_2.12:3.1.0 \
+  --conf "spark.local.dir=/tmp/spark_local" \
+  /data/delta-lake-pyspark-scd2/partitioning_test.py \
+  --part_path /data/delta/landing/header \
     > "${ITER_DIR}/partitioning_test.stdout.log" 2> "${ITER_DIR}/partitioning_test.stderr.log" || {
       echo "[${label}] partitioning_test FAILED (see ${ITER_DIR}/partitioning_test.stderr.log)"
       # prosegui comunque per raccogliere eventuali metriche residue
