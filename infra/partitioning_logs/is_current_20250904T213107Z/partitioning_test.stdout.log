@@ -1,0 +1,2 @@
+:: loading settings :: url = jar:file:/opt/spark-3.5.0-bin-hadoop3/jars/ivy-2.5.1.jar!/org/apache/ivy/core/settings/ivysettings.xml
+Metrics saved to /data/delta/metrics/partitioning_metrics/partitioning_20250904_213237.csv
