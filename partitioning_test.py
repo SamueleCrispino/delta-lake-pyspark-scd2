@@ -22,11 +22,12 @@ def main(args):
     where_clause = "valid_from_year = 2023 AND valid_from_month BETWEEN 1 AND 6 AND is_current is false"
 
     def run_query(table_path, tag):
-        query = f"SELECT COUNT(*) FROM delta.`{table_path}` WHERE {where_clause}"
+        df = spark.read.format("delta").load(table_path)
         start = time.time()
-        res = spark.sql(query).collect()[0][0]
+        res = df.filter("valid_from_year = 2023 AND valid_from_month BETWEEN 1 AND 6 AND is_current = false").count()
         dur = time.time() - start
-        return {"table": tag, "result": res, "duration_sec": dur, "query": query}
+        return {"table": tag, "result": res, "duration_sec": dur}
+
 
     # run su entrambe le versioni
     record = run_query(part_path, "partitioned")
