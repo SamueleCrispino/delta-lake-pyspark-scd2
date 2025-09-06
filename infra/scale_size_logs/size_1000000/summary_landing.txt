@@ -1,3 +1,0 @@
-total 8
-drwxr-sr-x 2 Crispinoadmin Crispinoadmin 4096 Sep  2 07:37 _delta_log
-drwxr-sr-x 4 Crispinoadmin Crispinoadmin 4096 Sep  1 13:07 valid_from_year=2023

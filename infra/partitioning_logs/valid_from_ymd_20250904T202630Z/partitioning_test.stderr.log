@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/data/delta-lake-pyspark-scd2/partitioning_test.py", line 5, in <module>
-    from pyspark.sql import SparkSession
-ModuleNotFoundError: No module named 'pyspark'

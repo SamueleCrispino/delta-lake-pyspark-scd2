@@ -1,0 +1,4 @@
+contratto_cod|numero_annuncio|list_total|contracted_price|total_discount|data_attivazione|data_fine_prestazione|product_code|quantity|causale_annullamento|data_annullamento|status_item|creazione_dta
+Y05310491|1|0|0|0|03/07/2022||SGF|1||01/11/2023|L|20221212
+Y07874551|10|599|599|0|07/11/2022|10/11/2023|MSE|1|||R|20221212
+Y05083182|7|144.89|144.89|0|||SBE|1|||R|20221212

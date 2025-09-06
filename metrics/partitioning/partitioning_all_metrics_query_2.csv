@@ -1,4 +1,4 @@
 duration_sec,result,partition,workers_used
-7.132162570953369,9583937,None,6
-7.79031229019165,9583937,is_current,6
+8.432162570953369,9583937,None,6
+8.79031229019165,9583937,is_current,6
 7.072977781295776,9583937,valid_from_year valid_from_month valid_from_day,6
